@@ -1,0 +1,320 @@
+---
+title: 'Proyecto: Exploratory Data Analysis'
+author: "Abelardo Monsalve"
+date: "2025-05-06"
+output:
+  slidy_presentation: default
+  beamer_presentation: default
+  ioslides_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	error = F,
+	message = FALSE,
+	warning = FALSE,
+	comment = ""
+)
+ #c. habitual
+xaringanExtra::use_clipboard()
+library(prettydoc) #Paquete de tema favorito
+library(reticulate) #Paquete de python en R
+use_python("C:/Users/Abelardo/AppData/Local/Programs/Python/Python312/python.exe") #Función
+```
+
+
+
+## Análisis de Datos Sociodemográficos.
+
+Una de las interrogantes asociadas con el análisis de los datos sociodemográficos gira en torno a los factores que influyen en el nivel de ingreso de los habitantes de una localidad.
+
+Estos datos, en su mayoría, contienen información demográfica y socioeconómica de las personas que la componen, tales cómo:
+
+-   Ingresos
+-   Edad
+-   Nivel educativo
+-   Ocupación
+-   Tamaño del asentamiento, entre otros.
+
+En función de estos atributos podemos orientar nuestro objetivo incial
+
+*Objetivo:* *¿Qué factores insiden en el nivel de ingreso de los habitantes de una ciudad?*
+
+
+## Cargando Librerias
+
+```{python echo=TRUE}
+# ====================================
+# Carga de librerías necesarias
+# ====================================
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+import pingouin as pg
+import warnings
+warnings.filterwarnings('ignore')
+
+## Cargando los datos
+
+data_df = pd.read_csv("sgdata.csv")
+data_df.info()
+
+```
+
+
+## Limpieza y preparación de datos
+
+```{python echo=TRUE}
+# Creamos una copia del DataFrame original para trabajar con él
+df = data_df.copy()
+
+# Verificamos si hay filas con datos faltantes en variables relevantes
+if df.isnull().sum().any():
+    print("Hay datos faltantes en las siguientes columnas:")
+    print(df.isnull().sum()[df.isnull().sum() > 0])
+else:
+    print("No hay datos faltantes en las columnas.") 
+
+
+```
+
+
+
+## Renombrando y recodificando variables.
+
+```{python echo=TRUE}
+
+df.rename(columns={'Marital status': 'estado_civil', 'Age': 'edad', 'Education': 'educacion', 'Occupation': 'ocupacion', 'Income': 'ingresos','Settlement size': 'tamano_asentamiento'}, inplace=True)
+
+# Recodificamos los valores de la variable 'Sexo'
+df['sexo'] = df['Sex'].map({1: 'hombre', 0 : 'mujer'})
+
+```
+
+```{python include=FALSE}
+
+# Recodificamos los valores de la variable 'Sexo'
+df['educacion'] = df['educacion'].map({'university': 'universitario', 'high school': 'Secundaria', 'other / unknown': 'otro', 'graduate school': 'Postgrado'})
+
+# Recodificamos los valores de la variable 'estado civil'
+df['estado_civil'] = df['estado_civil'].replace({
+    'single': 'soltero', 
+    'non-single (divorced / separated / married / widowed)': 'no-soltero'
+})
+
+```
+
+```{python include=FALSE}
+# Recodificamos los valores de la variable 'Ocupación'
+df['ocupacion'] = df['ocupacion'].map({'skilled employee / official': 'Empleado/cualificado/funcionario', 'unemployed / unskilled': 'Desempleado/no cualificado', 'management / self-employed / highly qualified employee / officer': 'directivo/autónomo/empleado/funcionario altamente cualificado'})
+
+# Eliminamos la columna Sex
+df=df.drop(columns=['Sex'])
+
+df['estado_civil'] = df['estado_civil'].replace({
+    'single': 'soltero', 
+    'non-single (divorced / separated / married / widowed)': 'otro'
+})
+
+```
+
+
+
+## Mostrando algunas variables
+
+```{python echo=TRUE}
+from tabulate import tabulate
+
+df_grouped = df['ingresos'].groupby(df['educacion']).agg(['mean', 'std', 'count']).reset_index()
+df_grouped.columns = ['educacion', 'Media de ingresos', 'Dev_Std ingresos', 'Cantidad']
+print(tabulate(df_grouped, headers='keys', tablefmt='fancy_grid'))
+
+```
+
+
+
+## Gráficos de distribución de la Variable Ingresos
+
+```{python echo=TRUE}
+# Histograma y Densidad de la variable ingresos
+plt.figure(figsize=(10,4))
+sns.histplot(df['ingresos'], kde=True)
+plt.title('Distribución de Ingresos')
+plt.show()
+```
+
+
+## Hipótesis 1: Nivel educativo.
+
+```{python echo=TRUE}
+
+fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+sns.boxplot(x="ingresos", y="educacion", data=df, ax=ax,palette='Set2')
+#sns.swarmplot(x="ingresos", y="educacion", data=df, color='black', alpha = 0.5, ax=ax);
+plt.title('Ingresos según Nivel Educativo')
+plt.show();
+```
+
+
+## ANOVA
+
+```{python echo=TRUE}
+
+anova_educacion = stats.kruskal(
+  *[group['ingresos'].values for name, group in df.groupby('educacion')]
+)
+
+anova_educacion_df = pd.DataFrame({
+  'F-statistic': anova_educacion.statistic,
+  'p-value': anova_educacion.pvalue
+}, index=['ANOVA'])
+
+anova_educacion_df['Significativo'] = anova_educacion_df['p-value'] < 0.05
+anova_educacion_df['Significativo'] = anova_educacion_df['Significativo'].replace({True: 'Sí', False: 'No'})
+print(anova_educacion_df)
+
+if anova_educacion_df['Significativo'].values[0] == 'Sí':
+  print("Se rechaza la hipótesis nula: hay diferencias significativas entre los niveles educativos y sus ingresos.")
+else:
+  print("No se rechaza la hipótesis nula: no hay diferencias significativas entre los niveles educativos y sus ingresos.")
+
+```
+
+
+## Comparación de medias con la Prueba de Tukey.
+
+Para determinar cuál de los grupos es el que difiere de los demás, se llevan a cabo las *Pruebas post hoc* después de realizar el ANOVA. Una de las pruebas post hoc comunes es la ***prueba de Tukey.***
+
+```{python echo=TRUE}
+# Comparación de medias con Tukey-Kramer Honest Significant Difference
+pg.pairwise_tukey(data=df, dv='ingresos', between='educacion').round(3)
+
+
+```
+*El nivel educativo tiene un efecto estadísticamente significativo sobre los ingresos.*
+
+*Al observar la prueba de Tukey, podemos ver que los grupos que muestran un p-valor significativo son Universitario y Postgrado. Esto respalda la hipótesis: a mayor educación, mayores ingresos.
+
+
+## Hipotesis 2: Tamaño del asentamiento.
+```{python echo=TRUE}
+# Boxplot tamaño asentamiento vs ingresos
+plt.figure(figsize=(8,4))
+sns.boxplot(x='tamano_asentamiento', y='ingresos', data=df, palette='Set2')
+plt.title('Ingresos según Tamaño de Asentamiento')
+plt.show()
+```
+
+
+## ANOVA
+```{python echo=TRUE}
+anova_asentamiento = stats.kruskal(
+    *[group['ingresos'].values for name, group in df.groupby('tamano_asentamiento')]
+)
+
+anova_asentamiento_df = pd.DataFrame({
+    'F-statistic': anova_asentamiento.statistic,
+    'p-value': anova_asentamiento.pvalue
+}, index=['ANOVA'])
+
+print(anova_asentamiento_df)
+
+if anova_asentamiento_df['p-value'].values[0] < 0.05:
+    print("Se rechaza la hipótesis nula: hay diferencias significativas entre el tamaño de los asentamientos y sus ingresos.")
+else:
+    print("No se rechaza la hipótesis nula: no hay diferencias significativas entre el tamaño de los asentamientos y sus ingresos.")
+```
+*El tamaño del asentamiento influye fuertemente en los ingresos. Procedemos similar a la hipótesis 1, concluyendo que las personas en asentamientos más grandes tienden a ganar más.*
+
+
+## Hipótesis 3: Estado Civil
+```{python echo=TRUE}
+# Boxplot de ingresos por estado civil
+sns.boxplot(x='estado_civil', y='ingresos', data=df,palette='Set2')
+plt.title('Ingresos según Estado Civil')
+plt.show()
+
+```
+
+
+## Prueba t
+```{python echo=TRUE}
+# Test t de Student
+solteros = df[df['estado_civil'] == 'soltero']['ingresos']
+no_soltero = df[df['estado_civil'] == 'no-soltero']['ingresos']
+
+t_stat, p_val = stats.ttest_ind(solteros, no_soltero, alternative='greater', equal_var=False)
+
+if p_val < 0.05:
+    print("Se rechaza la hipótesis nula: En promedio, los solteros tienen ingresos mayores.")
+else:
+    print("No se rechaza la hipótesis nula: En promedio, los solteros no tienen ingresos mayores.")
+```
+*El estado civil influye fuertemente en los ingresos. Existe evidencia estadística para concluir que, en promedio, Las personas solteras perciben ingresos superiores a los otros estados civiles.*
+
+
+## HIPÓTESIS 4: Edad como variable predictora.
+```{python echo=TRUE}
+# Modelo 1: Ingresos ~ Edad
+X = sm.add_constant(df['edad'])
+y = df['ingresos']
+
+modelo_edad = sm.OLS(y, X, missing='drop').fit()
+print(modelo_edad.summary())
+```
+
+
+## # Gráfico de ajuste
+```{python echo=TRUE}
+sns.scatterplot(x=df['edad'], y=df['ingresos'])
+plt.plot(df['edad'], modelo_edad.predict(X), color='red')
+plt.title('Ingresos vs Edad (Modelo Lineal)')
+plt.show()
+```
+
+## Hipótesis 5: Ingresos por Genero y Ocupación
+
+```{python echo=TRUE}
+plt.figure(figsize=(10,10))
+sns.boxplot(x='ocupacion', y='ingresos', hue='sexo', data=df)
+plt.title('Ingresos por Ocupación y Género');
+plt.xticks(rotation=25);
+plt.legend(title='Género')
+plt.show()
+```
+
+
+## Pruebas estadísticas:
+```{python echo=TRUE}
+ocupaciones = df['ocupacion'].unique()
+
+for ocupacion in ocupaciones:
+    subset = df[df['ocupacion'] == ocupacion]
+    hombres = subset[subset['sexo'] == 'hombre']['ingresos']
+    mujeres = subset[subset['sexo'] == 'mujer']['ingresos']
+    
+    if len(hombres) > 1 and len(mujeres) > 1:  # Evitar errores por grupos pequeños
+        t_stat, p_val = stats.ttest_ind(hombres, mujeres, alternative="greater", equal_var=False)
+        print(f'Ocupación: {ocupacion}')
+        print(f'  T-test (hombres vs mujeres): t = {t_stat:.2f}, p = {p_val:.4f}')
+        if p_val < 0.05:
+            print(f'Se rechaza la hipótesis nula: En promedio los ingresos de hombres son superiores que los de mujeres.')
+        else:
+            print(f'No se rechaza la hipótesis nula: No hay evidencia suficiente para afirmar que los ingresos de los hombres son superiores a las mujeres.')
+        print('------------------------------------------------')
+```        
+
+
+
+## CONCLUSIONES GENERALES:
+- La educación, estado civil y la edad son factores importantes para el ingreso.
+
+- Vivir en ciudades o asentamientos más grandes incrementa notablemente las oportunidades económicas.
+
+- Existe desigualdad de género en ingresos, dependiendo de la ocupación.
+
