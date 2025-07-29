@@ -38,4 +38,4 @@ Para indagar acerca de la respuesta a dicha pregunta, se plantean las siguientes
 - ***Hipótesis 4:*** La edad y el nivel educativo son factores significativos para predecir los ingresos.
 - ***Hipótesis 5:*** Hay diferencias significativas en los ingresos entre géneros para ciertas ocupaciones específicas.
 
-El análisis exploratorio de los datos y sus conclusiones se encuentran en el archivo [EDA](entrega_final_eda.ipynb). en este repositorio de GitHub [https://github.com/amonsalvec/Entrega_EDA](https://github.com/amonsalvec/Entrega_EDA).
+El análisis exploratorio de los datos y sus conclusiones se encuentran en el archivo [EDA](entrega_final_eda.ipynb), en el repositorio de GitHub [https://github.com/amonsalvec/Entrega_EDA](https://github.com/amonsalvec/Entrega_EDA).
